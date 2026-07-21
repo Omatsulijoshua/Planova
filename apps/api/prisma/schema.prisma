@@ -1,0 +1,845 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==============================================================================
+// ENUMS (15)
+// ==============================================================================
+
+enum UserStatus {
+  ACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+  DELETED
+}
+
+enum UserRoleType {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT_AGENT
+  ORG_ADMIN
+  ORG_MEMBER
+  PARENT
+  TEACHER
+  STUDENT
+  PROFESSIONAL
+  PREMIUM_USER
+  FREE_USER
+  GUEST
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  UNPAID
+  GRACE_PERIOD
+}
+
+enum EventType {
+  WORK
+  SCHOOL
+  EXERCISE
+  MEAL
+  SLEEP
+  PRAYER
+  PERSONAL
+  OTHER
+}
+
+enum EventFlexibility {
+  FIXED
+  SEMI_FLEXIBLE
+  FLEXIBLE
+  LOCKED
+}
+
+enum EventStatus {
+  CONFIRMED
+  TENTATIVE
+  CANCELLED
+}
+
+enum TimetableStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+enum ProposalStatus {
+  PENDING
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  EXPIRED
+  UNDONE
+}
+
+enum ScheduleChangeType {
+  CREATE
+  UPDATE
+  DELETE
+  MOVE
+}
+
+enum ApprovalAction {
+  APPROVE
+  REJECT
+  EDIT
+}
+
+enum AIProviderStatus {
+  ACTIVE
+  DEGRADED
+  INACTIVE
+}
+
+enum CalendarProvider {
+  GOOGLE
+  OUTLOOK
+  APPLE
+}
+
+enum NotificationType {
+  PUSH
+  EMAIL
+  SMS
+  WHATSAPP
+  IN_APP
+}
+
+enum AlarmStatus {
+  SCHEDULED
+  SNOOZED
+  DISMISSED
+  MISSED
+}
+
+enum PaymentStatus {
+  SUCCESSFUL
+  FAILED
+  PENDING
+  REFUNDED
+}
+
+// ==============================================================================
+// MODELS (48)
+// ==============================================================================
+
+// --- User Management (9 Models) ---
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  passwordHash String
+  status       UserStatus @default(PENDING_VERIFICATION)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  profile                 UserProfile?
+  preference              UserPreference?
+  devices                 UserDevice[]
+  sessions                UserSession[]
+  refreshTokens           RefreshToken[]
+  userRoles               UserRole[]
+  memberships             OrganizationMember[]
+  subscription            Subscription?
+  calendarAccounts        CalendarAccount[]
+  timetables              Timetable[]
+  tasks                   Task[]
+  routines                Routine[]
+  goals                   Goal[]
+  focusSessions           FocusSession[]
+  scheduleProposals       ScheduleProposal[]
+  scheduleApprovals       ScheduleApproval[]
+  aiUsages                AIUsage[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  auditLogs               AuditLog[]
+  tickets                 SupportTicket[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model UserProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  firstName   String?
+  lastName    String?
+  phoneNumber String?
+  avatarUrl   String?
+  persona     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserPreference {
+  id                    String   @id @default(uuid()) @db.Uuid
+  userId                String   @unique @db.Uuid
+  timezone              String   @default("UTC")
+  wakeTime              String   @default("07:00")
+  sleepTime             String   @default("23:00")
+  workDays              Int[] // 1=Monday, ..., 7=Sunday
+  schoolDays            Int[]
+  preferredStudyTime    String?
+  preferredFocusTime    String?
+  breakDuration         Int      @default(15) // in minutes
+  mealTimes             Json? // List of standard meal ranges
+  travelPadding         Int      @default(15) // padding in minutes
+  prayerTimesEnabled    Boolean  @default(false)
+  exercisePreferences   Json?
+  aiRearrangeAllowed    Boolean  @default(false)
+  maxTaskMovementWindow Int      @default(24) // in hours
+  protectedPeriods      Json? // Unmovable time blocks
+  controlMode           String   @default("SUGGEST") // SUGGEST, ASSISTED, AUTOPILOT
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserDevice {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  fcmToken   String   @unique
+  platform   String // android, ios, web
+  appVersion String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  isActive  Boolean  @default(true)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Role {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String       @unique
+  type      UserRoleType @default(FREE_USER)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  userRoles   UserRole[]
+  permissions Permission[]
+}
+
+model Permission {
+  id        String   @id @default(uuid()) @db.Uuid
+  action    String // e.g., "timetable:create"
+  resource  String // e.g., "timetable"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roles Role[]
+}
+
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+}
+
+// --- Multi-tenant (2 Models) ---
+
+model Organization {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  members    OrganizationMember[]
+  timetables Timetable[]
+}
+
+model OrganizationMember {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  userId         String   @db.Uuid
+  role           String // ADMIN, MEMBER
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// --- Billing & Subscriptions (5 Models) ---
+
+model SubscriptionPlan {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  code      String   @unique // e.g. "free", "student", "pro"
+  price     Decimal  @db.Decimal(10, 2)
+  currency  String   @default("USD")
+  interval  String   @default("month") // month, year
+  features  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                String             @id @default(uuid()) @db.Uuid
+  userId            String             @unique @db.Uuid
+  planId            String             @db.Uuid
+  status            SubscriptionStatus @default(TRIALING)
+  startDate         DateTime           @default(now())
+  endDate           DateTime
+  cancelAtPeriodEnd Boolean            @default(false)
+  paymentGateway    String // stripe, paystack, flutterwave, apple, google
+  gatewayCustomerId String?
+  gatewaySubId      String?
+  couponId          String?            @db.Uuid
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan         SubscriptionPlan     @relation(fields: [planId], references: [id])
+  coupon       Coupon?              @relation(fields: [couponId], references: [id])
+  transactions PaymentTransaction[]
+  payments     Payment[]
+
+  @@index([userId])
+}
+
+model Payment {
+  id             String        @id @default(uuid()) @db.Uuid
+  subscriptionId String        @db.Uuid
+  amount         Decimal       @db.Decimal(10, 2)
+  currency       String
+  status         PaymentStatus @default(PENDING)
+  reference      String        @unique
+  createdAt      DateTime      @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model PaymentTransaction {
+  id             String   @id @default(uuid()) @db.Uuid
+  subscriptionId String   @db.Uuid
+  gateway        String
+  gatewayTxId    String   @unique
+  rawPayload     Json?
+  status         String
+  createdAt      DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model Coupon {
+  id            String    @id @default(uuid()) @db.Uuid
+  code          String    @unique
+  discountType  String // percentage, fixed
+  discountValue Decimal   @db.Decimal(10, 2)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  subscriptions Subscription[]
+}
+
+// --- Timetable & External Calendars (6 Models) ---
+
+model CalendarAccount {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @db.Uuid
+  provider     CalendarProvider
+  email        String
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncTokens CalendarSyncToken[]
+  syncLogs   CalendarSyncLog[]
+
+  @@unique([userId, provider, email])
+}
+
+model CalendarSyncToken {
+  id         String   @id @default(uuid()) @db.Uuid
+  accountId  String   @db.Uuid
+  calendarId String
+  token      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  account CalendarAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, calendarId])
+}
+
+model CalendarSyncLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  accountId       String   @db.Uuid
+  action          String // PUSH, PULL
+  status          String // SUCCESS, FAILED
+  errorMessage    String?
+  eventsProcessed Int      @default(0)
+  timestamp       DateTime @default(now())
+
+  account CalendarAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model Timetable {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  organizationId String?         @db.Uuid
+  name           String
+  description    String?
+  status         TimetableStatus @default(DRAFT)
+  timezone       String          @default("UTC")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization?      @relation(fields: [organizationId], references: [id])
+  versions     TimetableVersion[]
+  events       Event[]
+  shares       SharedTimetable[]
+
+  @@index([userId])
+}
+
+model TimetableVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  timetableId String   @db.Uuid
+  version     Int
+  snapshot    Json // full JSON representation of the events
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  timetable Timetable @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+
+  @@index([timetableId])
+}
+
+model SharedTimetable {
+  id          String    @id @default(uuid()) @db.Uuid
+  timetableId String    @db.Uuid
+  shareToken  String    @unique
+  role        String // VIEW, COMMENT, EDIT, MANAGE
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  timetable Timetable @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+}
+
+// --- Events & Alarms (6 Models) ---
+
+model Event {
+  id          String           @id @default(uuid()) @db.Uuid
+  timetableId String           @db.Uuid
+  title       String
+  description String?
+  eventType   EventType        @default(PERSONAL)
+  flexibility EventFlexibility @default(FLEXIBLE)
+  status      EventStatus      @default(CONFIRMED)
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  meetingLink String?
+  travelTime  Int              @default(0) // in minutes
+  prepTime    Int              @default(0) // in minutes
+  colorCode   String?
+  isLocked    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  timetable    Timetable          @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  recurrences  EventRecurrence[]
+  participants EventParticipant[]
+  reminders    EventReminder[]
+  alarms       Alarm[]
+
+  @@index([timetableId])
+  @@index([startTime, endTime])
+}
+
+model EventRecurrence {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventId   String   @db.Uuid
+  rrule     String // RFC 5545 string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventParticipant {
+  id        String   @id @default(uuid()) @db.Uuid
+  eventId   String   @db.Uuid
+  name      String
+  email     String
+  status    String // ACCEPTED, DECLINED, TENTATIVE
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventReminder {
+  id            String   @id @default(uuid()) @db.Uuid
+  eventId       String   @db.Uuid
+  minutesBefore Int
+  method        String // PUSH, EMAIL, SMS
+  createdAt     DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Alarm {
+  id              String      @id @default(uuid()) @db.Uuid
+  eventId         String      @db.Uuid
+  fireTime        DateTime
+  status          AlarmStatus @default(SCHEDULED)
+  snoozeCount     Int         @default(0)
+  maxSnoozes      Int         @default(3)
+  vibration       Boolean     @default(true)
+  ascendingVolume Boolean     @default(true)
+  challengeType   String? // MATH, QR, STEPS, SHAKE, MEMORY
+  soundId         String?     @db.Uuid
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  event Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sound AlarmSound? @relation(fields: [soundId], references: [id])
+}
+
+model AlarmSound {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  fileUrl   String
+  isCustom  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  alarms Alarm[]
+}
+
+// --- Tasks, Routines, Goals, and Focus (5 Models) ---
+
+model Task {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  title        String
+  description  String?
+  dueDate      DateTime?
+  priority     String    @default("MEDIUM") // LOW, MEDIUM, HIGH
+  estimatedMin Int       @default(30)
+  actualMin    Int       @default(0)
+  isCompleted  Boolean   @default(false)
+  checklist    Json? // List of subtasks
+  project      String?
+  category     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dependencies  TaskDependency[] @relation("DependentTask")
+  prerequisites TaskDependency[] @relation("PrerequisiteTask")
+
+  @@index([userId])
+}
+
+model TaskDependency {
+  id             String   @id @default(uuid()) @db.Uuid
+  taskId         String   @db.Uuid
+  prerequisiteId String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  task         Task @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  prerequisite Task @relation("PrerequisiteTask", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, prerequisiteId])
+}
+
+model Routine {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  name         String
+  description  String?
+  frequency    String // DAILY, WEEKLY
+  schedule     Json? // Days of week/times
+  streakCount  Int       @default(0)
+  lastComplete DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Goal {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  title       String
+  description String?
+  targetDate  DateTime?
+  milestones  Json?
+  progress    Int       @default(0) // Percentage
+  aiPlan      Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FocusSession {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  durationMin Int
+  interrupts  Int      @default(0)
+  notes       String?
+  soundTrack  String?
+  completed   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// --- AI Planning Proposals (3 Models) ---
+
+model ScheduleProposal {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @db.Uuid
+  status      ProposalStatus @default(PENDING)
+  reason      String
+  explanation String?
+  confidence  Float          @default(1.0)
+  expiresAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  changes   ScheduleChange[]
+  approvals ScheduleApproval[]
+
+  @@index([userId])
+}
+
+model ScheduleChange {
+  id             String             @id @default(uuid()) @db.Uuid
+  proposalId     String             @db.Uuid
+  eventId        String?            @db.Uuid
+  type           ScheduleChangeType
+  originalValues Json?
+  proposedValues Json?
+  createdAt      DateTime           @default(now())
+
+  proposal ScheduleProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+}
+
+model ScheduleApproval {
+  id          String         @id @default(uuid()) @db.Uuid
+  proposalId  String         @db.Uuid
+  userId      String         @db.Uuid
+  action      ApprovalAction
+  comments    String?
+  approvedIds String[] // Specific Change IDs approved
+  rejectedIds String[]
+  createdAt   DateTime       @default(now())
+
+  proposal ScheduleProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// --- AI Provider Configurations (5 Models) ---
+
+model AIProvider {
+  id         String           @id @default(uuid()) @db.Uuid
+  name       String           @unique // e.g. "Google Gemini", "Groq", "OpenAI"
+  status     AIProviderStatus @default(ACTIVE)
+  priority   Int              @default(1)
+  weight     Int              @default(50)
+  timeoutMs  Int              @default(10000)
+  retryCount Int              @default(3)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  keys   AIProviderKey[]
+  models AIModel[]
+}
+
+model AIProviderKey {
+  id           String   @id @default(uuid()) @db.Uuid
+  providerId   String   @db.Uuid
+  encryptedKey String
+  mask         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  provider AIProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+}
+
+model AIModel {
+  id           String   @id @default(uuid()) @db.Uuid
+  providerId   String   @db.Uuid
+  name         String // e.g. "gemini-2.5-flash"
+  dailyLimit   Int      @default(1000)
+  rateLimitMin Int      @default(60)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  provider AIProvider  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  requests AIRequest[]
+}
+
+model AIRequest {
+  id           String   @id @default(uuid()) @db.Uuid
+  modelId      String   @db.Uuid
+  latencyMs    Int
+  promptTokens Int      @default(0)
+  compTokens   Int      @default(0)
+  isSuccess    Boolean  @default(true)
+  errorMessage String?
+  timestamp    DateTime @default(now())
+
+  model AIModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+model AIUsage {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  tokenCount   Int
+  requestCount Int      @default(1)
+  date         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// --- Notifications (3 Models) ---
+
+model Notification {
+  id     String           @id @default(uuid()) @db.Uuid
+  userId String           @db.Uuid
+  type   NotificationType
+  title  String
+  body   String
+  isRead Boolean          @default(false)
+  sentAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model NotificationPreference {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  type      NotificationType
+  isEnabled Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+}
+
+model Template {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique // e.g. "daily_summary"
+  subject   String?
+  body      String // markdown or HTML template
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- Audit & Support Tickets (4 Models) ---
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @db.Uuid
+  action     String // e.g. "auth:login", "timetable:delete"
+  resource   String // e.g. "User", "Timetable"
+  resourceId String?
+  ipAddress  String?
+  metadata   Json?
+  timestamp  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model SupportTicket {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  subject     String
+  description String
+  status      String // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AppSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique // e.g., "maintenance_mode"
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model FeatureFlag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique // e.g., "ai_planner_v2"
+  isEnabled Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}

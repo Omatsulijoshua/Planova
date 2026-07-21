@@ -1,0 +1,16 @@
+{
+  "name": "@planova/shared-types",
+  "version": "1.0.0",
+  "description": "Planova shared TypeScript interfaces and DTOs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "lint": "eslint src/**"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

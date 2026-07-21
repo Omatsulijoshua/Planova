@@ -11,6 +11,10 @@ describe('CalendarService', () => {
     user: {
       findUnique: jest.fn(),
     },
+    calendarAccount: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
     calendarSyncLog: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -48,6 +52,7 @@ describe('CalendarService', () => {
   describe('syncCalendar', () => {
     it('should create a sync log and audit log on successful sync', async () => {
       prisma.user.findUnique.mockResolvedValue({ id: 'user-1' });
+      prisma.calendarAccount.findFirst.mockResolvedValue({ id: 'account-1' });
       prisma.calendarSyncLog.create.mockResolvedValue({ id: 'log-1', status: 'SUCCESS' });
 
       const res = await service.syncCalendar('user-1');

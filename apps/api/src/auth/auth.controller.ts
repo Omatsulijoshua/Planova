@@ -3,9 +3,9 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { Request } from 'express';
+import * as express from 'express';
 
-interface AuthenticatedRequest extends Request {
+interface AuthenticatedRequest extends express.Request {
   user: {
     userId: string;
     email: string;
@@ -27,7 +27,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() loginDto: LoginDto,
-    @Req() req: Request,
+    @Req() req: express.Request,
   ) {
     const ip = req.ip;
     const userAgent = req.headers['user-agent'];

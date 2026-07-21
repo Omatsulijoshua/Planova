@@ -45,9 +45,17 @@ describe('AdminService', () => {
 
   describe('getUsers', () => {
     it('should return user selection', async () => {
-      prisma.user.findMany.mockResolvedValue([{ id: 'user-1', email: 'test@planova.com' }]);
+      prisma.user.findMany.mockResolvedValue([
+        {
+          id: 'user-1',
+          email: 'test@planova.com',
+          userRoles: [{ role: { name: 'ADMIN' } }],
+          createdAt: new Date(),
+        },
+      ]);
       const res = await service.getUsers();
       expect(res.length).toBe(1);
+      expect(res[0].role).toBe('ADMIN');
       expect(prisma.user.findMany).toHaveBeenCalled();
     });
   });
@@ -73,7 +81,7 @@ describe('AdminService', () => {
           ],
         },
         include: { user: { select: { email: true } } },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { timestamp: 'desc' },
         take: 100,
       });
     });

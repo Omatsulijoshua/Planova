@@ -6,7 +6,7 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRoleType } from '@prisma/client';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRoleType.ADMIN, UserRoleType.SYSTEM_ADMIN)
+@Roles(UserRoleType.ADMIN, UserRoleType.SUPER_ADMIN)
 @Controller('admin')
 export class AdminController {
   constructor(private adminService: AdminService) {}

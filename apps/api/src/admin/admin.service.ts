@@ -6,15 +6,28 @@ export class AdminService {
   constructor(private prisma: PrismaService) {}
 
   async getUsers() {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       select: {
         id: true,
         email: true,
-        role: true,
+        userRoles: {
+          select: {
+            role: {
+              select: { name: true },
+            },
+          },
+        },
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      role: u.userRoles[0]?.role.name || 'GUEST',
+      createdAt: u.createdAt,
+    }));
   }
 
   async getPlans() {
@@ -38,7 +51,7 @@ export class AdminService {
           select: { email: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { timestamp: 'desc' },
       take: 100,
     });
   }

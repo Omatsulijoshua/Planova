@@ -21,18 +21,32 @@ export class CalendarService {
       throw new NotFoundException('User not found');
     }
 
-    // Mock two-way sync computation: detect items and conflict resolution
+    // Ensure a mock calendar account exists to link the log to
+    let account = await this.prisma.calendarAccount.findFirst({
+      where: { userId },
+    });
+
+    if (!account) {
+      account = await this.prisma.calendarAccount.create({
+        data: {
+          userId,
+          provider: 'GOOGLE',
+          email: user.email,
+          accessToken: 'mock_token',
+        },
+      });
+    }
+
     const syncedItems = Math.floor(Math.random() * 10) + 1;
     const conflicts = Math.random() > 0.8 ? 1 : 0;
 
     return this.prisma.$transaction(async (tx) => {
       const log = await tx.calendarSyncLog.create({
         data: {
-          userId,
-          provider: 'GOOGLE', // Defaulting to Google for mock sync log
+          accountId: account!.id,
+          action: 'PULL',
           status: 'SUCCESS',
-          itemsSynced: syncedItems,
-          conflictsDetected: conflicts,
+          eventsProcessed: syncedItems,
           errorMessage: null,
         },
       });
@@ -61,13 +75,15 @@ export class CalendarService {
 
     return this.prisma.calendarSyncLog.findMany({
       where: {
-        userId,
-        createdAt: {
+        account: {
+          userId,
+        },
+        timestamp: {
           gte: thirtyDaysAgo,
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        timestamp: 'desc',
       },
     });
   }

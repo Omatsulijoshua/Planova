@@ -51,7 +51,7 @@ export class SubscriptionsService {
     // 2. Compute date windows (Trial = 14 days, Free = 100 years)
     const now = new Date();
     let endDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 days trial
-    let initialStatus = SubscriptionStatus.TRIALING;
+    let initialStatus: SubscriptionStatus = SubscriptionStatus.TRIALING;
 
     if (dto.planCode === 'free') {
       endDate = new Date(now.getTime() + 100 * 365 * 24 * 60 * 60 * 1000); // 100 years
@@ -175,7 +175,7 @@ export class SubscriptionsService {
     const now = new Date();
 
     return this.prisma.$transaction(async (tx) => {
-      let nextStatus = SubscriptionStatus.ACTIVE;
+      let nextStatus: SubscriptionStatus = SubscriptionStatus.ACTIVE;
       let newEndDate = sub.endDate;
 
       if (success) {

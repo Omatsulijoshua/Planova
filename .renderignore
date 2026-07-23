@@ -1,0 +1,10 @@
+# Render Deploy Ignore Rules
+# Overrides .gitignore so that built 'dist/' files are NOT ignored and get copied to the runner image.
+
+# Exclude git and workflow assets
+.git/
+.github/
+.vscode/
+
+# Exclude mobile client code
+apps/mobile/

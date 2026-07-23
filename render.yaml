@@ -1,5 +1,5 @@
 services:
-  # 1. NestJS API Backend Service
+  # 1. NestJS API Backend Service (Free Tier, no credit card required)
   - type: web
     name: planova-api
     env: node
@@ -14,8 +14,6 @@ services:
         value: production
       - key: DATABASE_URL
         value: postgresql://neondb_owner:npg_JOqv9a1kZEBo@ep-young-poetry-av52sebw-pooler.c-11.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-      - key: REDIS_URL
-        sync: false
       - key: JWT_SECRET
         value: super_secret_access_token_key_change_me
       - key: JWT_REFRESH_SECRET
@@ -24,9 +22,3 @@ services:
         value: 15m
       - key: JWT_REFRESH_EXPIRATION
         value: 7d
-
-  # 2. Redis Cache Service
-  - type: redis
-    name: planova-redis
-    plan: free
-    ipAllowList: [] # Only allow internal network traffic
